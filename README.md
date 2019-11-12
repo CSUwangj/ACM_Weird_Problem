@@ -203,9 +203,96 @@ test2.c:2:5: error: size of array ‘a’ is too large
      ^
 ```
 
-## 我开了一个稍小一些的全局数组，为什么编译还是失败了而且错误的原因非常复杂
+## 我开了一个稍小一些的全局数组，为什么编译还是失败了而且错误的原因非常复杂？
 
-（WIP）
+把错误名单上下拉动找一下，通常能看到下图类似的东西，说明你遇到的正是我现在要说的这个问题：
+
+![1573571964453](ACM中一些常见的问题及原因/1573571964453.png)
+
+首先需要了解的知识是一个可执行文件的文件格式，在Windows上的是PE文件格式（包括`.exe`、`.dll文`件），Linux上则是ELF文件。不过这里不做深入解析，大家只需要知道这些文件的一个构成部分是各种节。
+
+在Linux上使用`size`这个工具可以查看ELF文件的各个节的大小，这里我们准备三份代码，编译并使用size查看。
+
+```c
+// where_is_global.cpp
+#include<stdio.h>
+int a[1024];
+int main()
+{
+	printf("%OK");
+	return 0;
+}
+```
+
+```c
+// where_is_global2.cpp
+#include<stdio.h>
+int a[2048];
+int main()
+{
+	printf("%OK");
+	return 0;
+}
+```
+
+```c
+// where_is_global3.cpp
+#include<stdio.h>
+int a[1024] = {0};
+int main()
+{
+	printf("%OK");
+	return 0;
+}
+```
+
+```bash
+$ size where_is_global
+   text    data     bss     dec     hex filename
+   1467     584    4128    6179    1823 where_is_global
+$ size where_is_global2
+   text    data     bss     dec     hex filename
+   1467     584    8224   10275    2823 where_is_global2
+$ size where_is_global3
+   text    data     bss     dec     hex filename
+   1467     584    4128    6179    1823 where_is_global3
+```
+
+可以看到区别仅在于bss所对应的数字，也就是说默认情况下，全局变量在编译后文件存放于.bss节，这也就是出现问题的原因。
+
+默认情况下gcc对节的大小做了限制，如果超过的情况下就会出现这样的错误。但是这个是可以通过编译选项调整的，所以在不同的OJ上可能有不同的结果，在不同的环境下也不一定都能触发这个错误，下面是一份能在我的电脑上（Windows10 1903 Build, devcpp）触发的代码：
+
+```c
+#include<stdio.h>
+
+int a[1000000000000000000L];
+
+int main()
+{
+	printf("%dK\n",0);
+	return 0;
+}
+```
+
+## 我开了一个很大的全局数组并且通过了编译，可是为什么程序运行依然RE了？（等待答案）
+
+这里我也没有一个十分确定的答案，先直接给一个在我电脑上可以触发这样错误的程序
+
+```c
+#include<stdio.h>
+
+static int a[1000000000000L];
+
+int main()
+{
+	printf("%dK\n",a[1000000000L - 1]);
+	return 0;
+}
+```
+
+接下来我们深入到程序编译成的汇编代码里调试看一下，发现RE是出现在![1573579083511](ACM中一些常见的问题及原因/1573577931809.png)
+
+后来找了办法确定了RAX里存放的是数组的地址，但是除此之外也不知道为什么会出这个错。这里只能做一下猜测，原因和实机的内存相关，但是怎么测试我还没想到...
 
 ## 为什么越界会导致 RE？为什么有时候越界不会 RE 但是会 TLE/WA？
 
